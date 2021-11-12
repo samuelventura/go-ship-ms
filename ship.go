@@ -55,12 +55,7 @@ func run(node tree.Node) {
 				log.Println(err)
 				continue
 			}
-			err = keepAlive(conn)
-			if err != nil {
-				log.Println(err)
-				conn.Close()
-				continue
-			}
+			keepAlive(conn)
 			sshCon, sshch, reqch, err := ssh.NewClientConn(conn, addr, config)
 			if err != nil {
 				log.Println(err)
@@ -111,11 +106,7 @@ func run(node tree.Node) {
 					return
 				}
 				defer conn.Close()
-				err = keepAlive(conn)
-				if err != nil {
-					log.Println(err)
-					return
-				}
+				keepAlive(conn)
 				done := make(chan interface{}, 2)
 				go func() {
 					io.Copy(sshch, conn)
