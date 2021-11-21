@@ -99,12 +99,12 @@ func run(node tree.Node) {
 			addr := string(ch.ExtraData())
 			log.Println("open", addr)
 			defer log.Println("close", addr)
-			sshch, _, err := ch.Accept()
+			sshChan, reqChan, err := ch.Accept()
 			if err != nil {
 				log.Println(err)
 				return
 			}
-			defer sshch.Close()
+			defer sshChan.Close()
 			conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 			if err != nil {
 				log.Println(err)
@@ -114,11 +114,15 @@ func run(node tree.Node) {
 			keepAlive(conn)
 			done := make(chan interface{}, 2)
 			go func() {
-				io.Copy(sshch, conn)
+				for range reqChan {
+				}
+			}()
+			go func() {
+				io.Copy(sshChan, conn)
 				done <- true
 			}()
 			go func() {
-				io.Copy(conn, sshch)
+				io.Copy(conn, sshChan)
 				done <- true
 			}()
 			select {
@@ -127,7 +131,6 @@ func run(node tree.Node) {
 			}
 		}
 		node.AddProcess("sshch", func() {
-			defer log.Println("channel handler exited")
 			for ch := range sshch {
 				if ch.ChannelType() != "forward" {
 					ch.Reject(ssh.Prohibited, "unsupported")
