@@ -1,21 +1,19 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
-	"os/signal"
 
 	"github.com/samuelventura/go-state"
+	"github.com/samuelventura/go-tools"
 	"github.com/samuelventura/go-tree"
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	log.SetOutput(os.Stdout)
+	tools.SetupLog()
 
-	ctrlc := make(chan os.Signal, 1)
-	signal.Notify(ctrlc, os.Interrupt)
+	ctrlc := tools.SetupCtrlc()
+	stdin := tools.SetupStdinAll()
 
 	log.Println("start", os.Getpid())
 	defer log.Println("exit")
@@ -24,27 +22,21 @@ func main() {
 	defer rnode.WaitDisposed()
 	//recover closes as well
 	defer rnode.Recover()
+	rnode.SetValue("name", tools.GetEnviron("SHIP_NAME", tools.GetHostname()))
+	rnode.SetValue("keypath", tools.GetEnviron("SHIP_DOCK_KEYPATH", tools.WithExtension("key")))
+	rnode.SetValue("pool", tools.GetEnviron("SHIP_DOCK_POOL", "127.0.0.1:31622"))
+	rnode.SetValue("record", tools.GetEnviron("SHIP_DOCK_RECORD", ""))
+	rnode.SetValue("state", tools.GetEnviron("SHIP_STATE", tools.WithExtension("state")))
 
-	spath := state.SingletonPath()
-	snode := state.Serve(rnode, spath)
+	snode := state.Serve(rnode, rnode.GetValue("state").(string))
 	defer snode.WaitDisposed()
 	defer snode.Close()
-	log.Println("socket", spath)
 
 	anode := rnode.AddChild("api")
 	defer anode.WaitDisposed()
 	defer anode.Close()
-	anode.SetValue("name", getenv("SHIP_NAME", hostname()))
-	anode.SetValue("keypath", getenv("SHIP_DOCK_KEYPATH", withext("key")))
-	anode.SetValue("pool", getenv("SHIP_DOCK_POOL", "127.0.0.1:31622"))
-	anode.SetValue("record", getenv("SHIP_DOCK_RECORD", ""))
 	run(anode)
 
-	stdin := make(chan interface{})
-	go func() {
-		defer close(stdin)
-		ioutil.ReadAll(os.Stdin)
-	}()
 	select {
 	case <-rnode.Closed():
 	case <-snode.Closed():

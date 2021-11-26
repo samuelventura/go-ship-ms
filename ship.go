@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samuelventura/go-tools"
 	"github.com/samuelventura/go-tree"
 	"golang.org/x/crypto/ssh"
 )
@@ -20,11 +21,11 @@ func run(node tree.Node) {
 	keypath := node.GetValue("keypath").(string)
 	key, err := ioutil.ReadFile(keypath)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	signer, err := ssh.ParsePrivateKey(key)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	hkcb := func(hostname string, remote net.Addr, key ssh.PublicKey) error { return nil }
 	config := &ssh.ClientConfig{
@@ -36,7 +37,7 @@ func run(node tree.Node) {
 	if len(record) > 0 {
 		txts, err = net.LookupTXT(record)
 		if err != nil {
-			log.Fatal(err)
+			log.Panicln(err)
 		}
 	} else {
 		txts = []string{pool}
@@ -60,7 +61,7 @@ func run(node tree.Node) {
 			log.Println(err)
 			continue
 		}
-		keepAlive(conn)
+		tools.KeepAlive(conn, 5)
 		sshCon, sshch, reqch, err := ssh.NewClientConn(conn, addr, config)
 		if err != nil {
 			log.Println(err)
@@ -111,7 +112,7 @@ func run(node tree.Node) {
 				return
 			}
 			defer conn.Close()
-			keepAlive(conn)
+			tools.KeepAlive(conn, 5)
 			done := make(chan interface{}, 2)
 			go func() {
 				for range reqChan {
@@ -141,5 +142,5 @@ func run(node tree.Node) {
 		})
 		return
 	}
-	log.Fatalln("connection failed", txts)
+	log.Panicln("connection failed", txts)
 }
