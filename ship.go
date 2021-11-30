@@ -18,7 +18,9 @@ func run(node tree.Node) {
 	name := node.GetValue("name").(string)
 	pool := node.GetValue("pool").(string)
 	record := node.GetValue("record").(string)
+	count := node.GetValue("count").(*countDso)
 	keypath := node.GetValue("keypath").(string)
+	id := node.GetValue("id").(*idDso)
 	key, err := ioutil.ReadFile(keypath)
 	if err != nil {
 		log.Panicln(err)
@@ -55,7 +57,7 @@ func run(node tree.Node) {
 	for i := 0; i < l; i++ {
 		ii := (n + i) % l
 		addr := eps[ii]
-		log.Println(ii, addr, name)
+		log.Println("ep", ii, addr, name)
 		conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 		if err != nil {
 			log.Println(err)
@@ -98,14 +100,6 @@ func run(node tree.Node) {
 		})
 		handleForward := func(ch ssh.NewChannel) {
 			addr := string(ch.ExtraData())
-			log.Println("open", addr)
-			defer log.Println("close", addr)
-			sshChan, reqChan, err := ch.Accept()
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			defer sshChan.Close()
 			conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 			if err != nil {
 				log.Println(err)
@@ -113,6 +107,12 @@ func run(node tree.Node) {
 			}
 			defer conn.Close()
 			tools.KeepAlive(conn, 5)
+			sshChan, reqChan, err := ch.Accept()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			defer sshChan.Close()
 			done := make(chan interface{}, 2)
 			go func() {
 				for range reqChan {
@@ -131,13 +131,29 @@ func run(node tree.Node) {
 			case <-node.Closed():
 			}
 		}
+		setupForward := func(ch ssh.NewChannel, cid string) {
+			defer node.IfRecoverAction(func() {
+				ch.Reject(ssh.ConnectionFailed, "closing")
+			})
+			child := node.AddChild(cid)
+			child.AddProcess("handler", func() {
+				defer child.IfRecoverAction(func() {
+					ch.Reject(ssh.ConnectionFailed, "panic")
+				})
+				log.Println("open", count.increment(), cid)
+				defer func() { log.Println("close", count.decrement(), cid) }()
+				handleForward(ch)
+			})
+		}
 		node.AddProcess("sshch", func() {
 			for ch := range sshch {
 				if ch.ChannelType() != "forward" {
 					ch.Reject(ssh.Prohibited, "unsupported")
 					return
 				}
-				go handleForward(ch)
+				addr := string(ch.ExtraData())
+				cid := id.next(addr)
+				setupForward(ch, cid)
 			}
 		})
 		return

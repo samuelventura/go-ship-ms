@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/samuelventura/go-state v0.1.3
 	github.com/samuelventura/go-tools v0.1.6
-	github.com/samuelventura/go-tree v0.1.1
+	github.com/samuelventura/go-tree v0.1.2
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 )
 

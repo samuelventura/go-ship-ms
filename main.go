@@ -27,6 +27,8 @@ func main() {
 	rnode.SetValue("pool", tools.GetEnviron("SHIP_DOCK_POOL", "127.0.0.1:31622"))
 	rnode.SetValue("record", tools.GetEnviron("SHIP_DOCK_RECORD", ""))
 	rnode.SetValue("state", tools.GetEnviron("SHIP_STATE", tools.WithExtension("state")))
+	rnode.SetValue("count", newCount())
+	rnode.SetValue("id", newId("ch"))
 
 	snode := state.Serve(rnode, rnode.GetValue("state").(string))
 	defer snode.WaitDisposed()
